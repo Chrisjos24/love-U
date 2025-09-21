@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Responsive Card Slider — Loop + Glass + Swipe + Tap</title>
+<style>
+  :root{
+    --card-w: 220px;
+    --card-h: 320px;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: radial-gradient(circle at 25% 25%, #3b004e 0%, #07000a 65%);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+
+  .slider{
+    width: min(880px, 92vw);
+    height: min(420px, 72vh);
+    position: relative;
+    perspective: 1400px;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    user-select: none;
+
+    /* remove highlight */
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+
+  .card{
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: var(--card-w);
+    height: var(--card-h);
+    border-radius: 18px;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 18px 45px rgba(0,0,0,0.6);
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    padding:18px;
+    text-align:center;
+    transition: transform 0.85s cubic-bezier(.22,1,.36,1), opacity .45s ease;
+    transform-origin: center;
+    overflow: hidden;
+    touch-action: none;
+
+    /* 🚫 remove blue highlight + selection */
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+  }
+
+  .card::before{
+    content:"";
+    position:absolute;
+    top:-60%;
+    left:-60%;
+    width:220%;
+    height:220%;
+    background: linear-gradient(120deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 60%);
+    transform: rotate(25deg);
+    pointer-events:none;
+  }
+
+  .label{
+    font-weight:700;
+    font-size:1.5rem;
+    margin-bottom:8px;
+    text-shadow:0 2px 6px rgba(0,0,0,0.6);
+  }
+
+  p { margin:0; color:#eaeaea; }
+
+  @media (max-width:600px){
+    :root { --card-w:160px; --card-h:240px; }
+    .slider { height: min(360px, 78vh); }
+  }
+
+  /* 🔥 Global fix: remove tap highlight everywhere */
+  * {
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  :focus {
+    outline: none !important;
+  }
+</style>
+</head>
+<body>
+  <div class="slider" id="slider">
+    <div class="card"><div class="label">01</div><p>Hi 👋</p></div>
+    <div class="card"><div class="label">02</div><p>I want to tell you Something 😍</p></div>
+    <div class="card"><div class="label">03</div><p>Please Keep Dragging 😊</p></div>
+    <div class="card"><div class="label">04</div><p>You are Amazing 😍</p></div>
+    <div class="card"><div class="label">05</div><p>Most Beautiful Person on Earth 💯</p></div>
+    <div class="card"><div class="label">06</div><p>And Cutest 🌸</p></div>
+    <div class="card"><div class="label">07</div><p>You make me Smile 😊</p></div>
+    <div class="card"><div class="label">08</div><p>Never forget your Worth 🌟</p></div>
+    <div class="card"><div class="label">09</div><p>You inspire me 💡</p></div>
+    <div class="card"><div class="label">10</div><p>Always Stay Happy ❤️</p></div>
+  </div>
+
+<script>
+(function(){
+  const slider = document.getElementById('slider');
+  const cards = Array.from(slider.querySelectorAll('.card'));
+  let current = 0;
+
+  let sliderRect = null;
+  let cardRect = null;
+  let baseX = 0, baseY = 0;
+  let X_STEP = 0, Y_STEP = 0, SCALE_STEP = 0;
+  const ROTZ_STEP = 6, ROTY_STEP = -8;
+  let Z_STEP = -40;
+  const MAX_VISIBLE = 8;
+
+  function calcMetrics(){
+    sliderRect = slider.getBoundingClientRect();
+    cardRect = cards[0].getBoundingClientRect();
+    const leftMargin = Math.max(12, sliderRect.width * 0.04);
+    const topMargin = Math.max(12, sliderRect.height * 0.05);
+
+    baseX = -(sliderRect.width - cardRect.width - leftMargin);
+    baseY = -(sliderRect.height - cardRect.height - topMargin);
+
+    X_STEP = Math.max(60, cardRect.width * 0.55);
+    Y_STEP = Math.max(28, cardRect.height * 0.24);
+    SCALE_STEP = Math.min(0.12, cardRect.width / 220 * 0.06);
+    Z_STEP = sliderRect.width < 480 ? -24 : -40;
+  }
+
+  function updateCards(){
+    cards.forEach((card, i) => {
+      const offset = i - current;
+      if (offset < 0) {
+        card.style.opacity = '0';
+        card.style.transform = `translate(${baseX - 60}px, ${baseY - 20}px) rotate(-8deg) scale(.88)`;
+        card.style.zIndex = 0;
+      } else {
+        const tx = baseX + offset * X_STEP;
+        const ty = baseY + offset * Y_STEP;
+        const scale = Math.max(0.64, 1 - offset * SCALE_STEP);
+        const rz = offset * ROTZ_STEP;
+        const ry = offset * ROTY_STEP;
+        const tz = offset === 0 ? Math.abs(Z_STEP) * 0.8 + 30 : Z_STEP * Math.min(offset, 6);
+
+        card.style.opacity = offset > MAX_VISIBLE ? '0' : '1';
+        card.style.transform = `
+          translate(${tx}px, ${ty}px)
+          translateZ(${tz}px)
+          rotateY(${ry}deg)
+          rotate(${rz}deg)
+          scale(${scale})
+        `;
+        card.style.zIndex = 1000 - Math.min(500, offset * 10);
+      }
+    });
+  }
+
+  function refreshLayout(){
+    requestAnimationFrame(() => {
+      calcMetrics();
+      updateCards();
+    });
+  }
+
+  // --- Swipe handling with loop ---
+  let startX = 0, isDragging = false;
+  const SWIPE_THRESHOLD_RATIO = 0.12;
+
+  function onTouchStart(e){
+    if (!e.touches.length) return;
+    isDragging = true;
+    startX = e.touches[0].clientX;
+  }
+
+  function onTouchEnd(e){
+    if (!isDragging) return;
+    isDragging = false;
+    const endX = e.changedTouches[0].clientX;
+    const dx = endX - startX;
+    const threshold = Math.max(24, sliderRect.width * SWIPE_THRESHOLD_RATIO);
+
+    if (dx < -threshold) {
+      current = (current + 1) % cards.length; // loop forward
+    } else if (dx > threshold) {
+      current = (current - 1 + cards.length) % cards.length; // loop backward
+    }
+    updateCards();
+  }
+
+  // Click handler (always active on both desktop & touch)
+  function onClick(){
+    current = (current + 1) % cards.length;
+    updateCards();
+  }
+
+  function attachHandlers(){
+    slider.addEventListener('click', onClick);
+    slider.addEventListener('touchstart', onTouchStart, {passive:true});
+    slider.addEventListener('touchend', onTouchEnd);
+
+    window.addEventListener('resize', refreshLayout);
+    window.addEventListener('orientationchange', refreshLayout);
+  }
+
+  refreshLayout();
+  attachHandlers();
+})();
+</script>
+</body>
+</html>
